@@ -4,4 +4,5 @@ __pycache__/
 venv/
 
 # Environment Variables
-.envtoken.json
+.env
+token.json

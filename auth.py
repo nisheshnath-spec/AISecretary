@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 import os
 import json
 import base64
+from parsing import parse_emails
 
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
@@ -70,24 +71,36 @@ def profile():
     creds = Credentials.from_authorized_user_info(json.loads(session['credentials']), SCOPES)
     service = build('gmail', 'v1', credentials=creds)
     user_info = service.users().getProfile(userId='me').execute()
-    messages = service.users().messages().list(userId='me', maxResults=5).execute()
-    message_id = messages['messages'][2]['id']
-    msg = service.users().messages().get(userId='me', id=message_id).execute()
+    parsed_emails = parse_emails(creds)
+    #print out in html for now
+    html = ""
+    for email in parsed_emails:
+        html += f"<h2>Subject:</h2><p>{email['subject']}</p>"
+        html += f"<h2>Sender:</h2><p>{email['sender']}</p>"
+        html += f"<h2>Date:</h2><p>{email['date']}</p>"
+        html += f"<h2>Body:</h2><pre>{email['body']}</pre><hr>"
+    return html
 
-    headers = msg['payload'].get('headers', [])
-    subject = next((header['value'] for header in headers if header['name'] == 'Subject'), 'No Subject')
 
-    parts = msg['payload'].get('parts', [])
-    body_data = None
-    for part in parts:
-        if part.get('mimeType') == 'text/plain':
-            body_data = part['body'].get('data')
-            break
-    if not body_data:
-        return "no plain text body found"
+
+    # messages = service.users().messages().list(userId='me', maxResults=5).execute()
+    # message_id = messages['messages'][0]['id']
+    # msg = service.users().messages().get(userId='me', id=message_id).execute()
+
+    # headers = msg['payload'].get('headers', [])
+    # for header in headers:
+    #     if header['name'] == 'Subject':
+    #         subject = header['value']
+    #         break
+    # parts = msg['payload'].get('parts', [])
+    # body_data = None
+    # for part in parts:
+    #     if part.get('mimeType') == 'text/plain':
+    #         body_data = part['body'].get('data')
+    #         continue
+    # if not body_data:
+    #     return "no plain text body found"
     
-    decoded_bytes = base64.urlsafe_b64decode(body_data + '==')
-    decoded_text = decoded_bytes.decode('utf-8')
-    # return f"You are logged in as {user_info['emailAddress']}<br>" 
-    return f"<h2>Subject:</h2><p>{subject}</p><h2>Body:</h2><pre>{decoded_text}</pre>"
-
+    # decoded_bytes = base64.urlsafe_b64decode(body_data + '==')
+    # decoded_text = decoded_bytes.decode('utf-8')
+    # return f"<h2>Subject:</h2><p>{subject}</p><h2>Body:</h2><pre>{decoded_text}</pre>"

@@ -1,8 +1,10 @@
-from flask import Flask, session
+from flask import Flask, session, redirect, url_for
 from dotenv import load_dotenv
 import os
-
+from parsing import parse_emails
 from auth import login, oauth2callback, profile
+import json
+
 
 load_dotenv()
 app = Flask(__name__)

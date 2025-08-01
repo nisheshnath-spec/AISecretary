@@ -2,8 +2,9 @@ import base64
 from googleapiclient.discovery import build
 import re
 from bs4 import BeautifulSoup
+from summarizer import summarize_email
 
-def parse_emails(creds, timeframe = '1d', max_results = 15):
+def parse_emails(creds, timeframe = '1d', max_results = 3):
     """Fetches and parses emails within a given timeframe. It will return a list of emails
     with keys, subcet, sender, date, and body."""
     service = build('gmail', 'v1', credentials=creds)
@@ -34,6 +35,7 @@ def parse_emails(creds, timeframe = '1d', max_results = 15):
         #Extractin the plain body text
         body = 'No Plain Text Body'
         body_plain = ""
+        body_summary = "No Summary available"
         if 'parts' in payload:
             for parts in payload['parts']:
                 if parts.get('mimeType') == 'text/html':
@@ -41,19 +43,23 @@ def parse_emails(creds, timeframe = '1d', max_results = 15):
                     decoded = base64.urlsafe_b64decode(data + '==').decode('utf-8')
                     body = decoded
                     body_plain = clean_html(decoded)
+                    body_summary = summarize_email(body_plain)
                     break
         # Fallback for body if not found in parts
         elif 'body' in payload and 'data' in payload['body']:
             data = payload['body']['data']
             decoded = base64.urlsafe_b64decode(data + '==').decode('utf-8')
             body = decoded
+            body_plain = clean_html(decoded)
+            body_summary = summarize_email(body_plain)
         
         email_list.append({
             'subject': subject,
             'sender': sender,
             'date': date,
             'body': body,
-            'body_plain': body_plain
+            'body_plain': body_plain,
+            'body_summary': body_summary,
         })
     
     return email_list

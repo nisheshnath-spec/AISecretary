@@ -79,6 +79,7 @@ def profile():
         html += f"<h2>Sender:</h2><p>{email['sender']}</p>"
         html += f"<h2>Date:</h2><p>{email['date']}</p>"
         html += f"<h2>Body:</h2><pre>{email['body']}</pre><hr>"
+        html += f"<h2>Body_summary:</h2><pre>{email['body_summary']}</pre><hr>"
     return html
 
 

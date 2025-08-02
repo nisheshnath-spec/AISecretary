@@ -9,6 +9,7 @@ import os
 import json
 import base64
 from parsing import parse_emails
+from summarizer import returnList, rank, clear_summaries
 
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
@@ -71,15 +72,23 @@ def profile():
     creds = Credentials.from_authorized_user_info(json.loads(session['credentials']), SCOPES)
     service = build('gmail', 'v1', credentials=creds)
     user_info = service.users().getProfile(userId='me').execute()
+    clear_summaries()
     parsed_emails = parse_emails(creds)
     #print out in html for now
+    # html = ""
+    # for email in parsed_emails:
+    #     html += f"<h2>Subject:</h2><p>{email['subject']}</p>"
+    #     html += f"<h2>Sender:</h2><p>{email['sender']}</p>"
+    #     html += f"<h2>Date:</h2><p>{email['date']}</p>"
+    #     html += f"<h2>Body:</h2><pre>{email['body']}</pre><hr>"
+    #     html += f"<h2>Body_summary:</h2><pre>{email['body_summary']}</pre><hr>"
+    emails = returnList()
+    order = rank()
     html = ""
-    for email in parsed_emails:
-        html += f"<h2>Subject:</h2><p>{email['subject']}</p>"
-        html += f"<h2>Sender:</h2><p>{email['sender']}</p>"
-        html += f"<h2>Date:</h2><p>{email['date']}</p>"
-        html += f"<h2>Body:</h2><pre>{email['body']}</pre><hr>"
-        html += f"<h2>Body_summary:</h2><pre>{email['body_summary']}</pre><hr>"
+    for i in order:
+        for email in emails:
+            if email['number'] == i:
+                html += f"<h2>Email {i}</h2><p>{email['summary']}</p>"
     return html
 
 

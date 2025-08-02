@@ -2,7 +2,7 @@ import base64
 from googleapiclient.discovery import build
 import re
 from bs4 import BeautifulSoup
-from summarizer import summarize_email
+from summarizer import summarize_email, rank, add_summary, returnList
 
 def parse_emails(creds, timeframe = '1d', max_results = 3):
     """Fetches and parses emails within a given timeframe. It will return a list of emails
@@ -44,6 +44,7 @@ def parse_emails(creds, timeframe = '1d', max_results = 3):
                     body = decoded
                     body_plain = clean_html(decoded)
                     body_summary = summarize_email(body_plain)
+                    add_summary(body_summary)
                     break
         # Fallback for body if not found in parts
         elif 'body' in payload and 'data' in payload['body']:
@@ -52,6 +53,7 @@ def parse_emails(creds, timeframe = '1d', max_results = 3):
             body = decoded
             body_plain = clean_html(decoded)
             body_summary = summarize_email(body_plain)
+            add_summary(body_summary)
         
         email_list.append({
             'subject': subject,

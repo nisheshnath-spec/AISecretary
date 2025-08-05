@@ -1,8 +1,9 @@
+#parsing.py 
 import base64
 from googleapiclient.discovery import build
 import re
 from bs4 import BeautifulSoup
-from summarizer import summarize_email, rank, add_summary, returnList
+from summarizer import summarize_email
 
 def parse_emails(creds, timeframe = '1d', max_results = 3):
     """Fetches and parses emails within a given timeframe. It will return a list of emails
@@ -14,8 +15,8 @@ def parse_emails(creds, timeframe = '1d', max_results = 3):
     results = service.users().messages().list(userId = 'me', q = query, maxResults = max_results).execute()
     
     messages = results.get('messages', [])
-    email_list = []
-    
+    email_list = []  
+    email_id = 1
     for msg_meta in messages:
         msg_id = msg_meta['id']
         msg = service.users().messages().get(userId='me', id=msg_id).execute()
@@ -36,6 +37,7 @@ def parse_emails(creds, timeframe = '1d', max_results = 3):
         body = 'No Plain Text Body'
         body_plain = ""
         body_summary = "No Summary available"
+        reply_code = -1
         if 'parts' in payload:
             for parts in payload['parts']:
                 if parts.get('mimeType') == 'text/html':
@@ -44,7 +46,8 @@ def parse_emails(creds, timeframe = '1d', max_results = 3):
                     body = decoded
                     body_plain = clean_html(decoded)
                     body_summary = summarize_email(body_plain)
-                    add_summary(body_summary)
+                    reply_code = int(body_summary[0:1])
+                    body_summary = body_summary[2:]
                     break
         # Fallback for body if not found in parts
         elif 'body' in payload and 'data' in payload['body']:
@@ -53,17 +56,20 @@ def parse_emails(creds, timeframe = '1d', max_results = 3):
             body = decoded
             body_plain = clean_html(decoded)
             body_summary = summarize_email(body_plain)
-            add_summary(body_summary)
+            reply_code = int(body_summary[0:1])
+            body_summary = body_summary[2:]
         
         email_list.append({
+            'email_id': email_id,
             'subject': subject,
             'sender': sender,
             'date': date,
             'body': body,
             'body_plain': body_plain,
             'body_summary': body_summary,
+            'reply_code': reply_code,
         })
-    
+        email_id += 1
     return email_list
 
 def clean_html(html):

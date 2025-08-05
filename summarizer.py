@@ -1,3 +1,4 @@
+# summarizer.py
 import os
 from dotenv import load_dotenv
 from together import Together
@@ -13,32 +14,16 @@ if TOGETHER_API_KEY is None:
 # Create the Together client
 client = Together(api_key=TOGETHER_API_KEY)
 
-#global list of summaries
-summariesList = []
-
 # Model to use (you can swap this out if you like)
 MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
 
-#add summaries to summary list
-def add_summary(body_summary):
-    summariesList.append({
-        'number': len(summariesList)+1,
-        'summary': body_summary
-    })
-    
-def returnList():
-    return summariesList
-
-def clear_summaries():
-    summariesList.clear()
-
 #rank the summaries based upon importance
-def rank():
-    if not summariesList:
+def rank(email_list):
+    if not email_list:
         return []
     numbered_list = ""
-    for summary in summariesList:
-        numbered_list += f"{summary['number']}. {summary['summary']}\n"
+    for summary in email_list:
+        numbered_list += f"{summary['email_id']}. {summary['body_summary']}\n"
     completion = client.chat.completions.create(
         model=MODEL,
         messages=[
@@ -53,7 +38,7 @@ def rank():
             }
         ],
         temperature=0.3,
-        max_tokens=500
+        max_tokens=450
     )
     answer = completion.choices[0].message.content.strip()
     ranked_order = []
@@ -77,7 +62,17 @@ def summarize_email(plain_body):
         messages=[
             {
                 "role": "system",
-                "content": "You are an assistant that summarizes briefly summarizes emails, including but not limited to upcoming meetings, dates, assignments, and news."
+                "content": """You are an assistant that processes email content.
+                    Given an email, return a short summary and determine if a response is needed.
+                    Only include it near the body summary
+
+                    Reply Code Legend:
+                    - 0 = No reply needed
+                    - 1 = Reply is needed
+                    - 2 = Urgent reply required
+
+                    Separate the reply code and body summary by a period and space.
+                    """
             },  
             {
                 "role": "user",
@@ -88,3 +83,4 @@ def summarize_email(plain_body):
         max_tokens=256
     )
     return completion.choices[0].message.content.strip()
+    

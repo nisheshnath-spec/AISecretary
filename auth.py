@@ -1,3 +1,4 @@
+#auth.py
 import os
 import flask
 from flask import redirect, session, url_for, request
@@ -9,7 +10,7 @@ import os
 import json
 import base64
 from parsing import parse_emails
-from summarizer import returnList, rank, clear_summaries
+from summarizer import rank
 
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
@@ -72,7 +73,6 @@ def profile():
     creds = Credentials.from_authorized_user_info(json.loads(session['credentials']), SCOPES)
     service = build('gmail', 'v1', credentials=creds)
     user_info = service.users().getProfile(userId='me').execute()
-    clear_summaries()
     parsed_emails = parse_emails(creds)
     #print out in html for now
     # html = ""
@@ -82,14 +82,20 @@ def profile():
     #     html += f"<h2>Date:</h2><p>{email['date']}</p>"
     #     html += f"<h2>Body:</h2><pre>{email['body']}</pre><hr>"
     #     html += f"<h2>Body_summary:</h2><pre>{email['body_summary']}</pre><hr>"
-    emails = returnList()
-    order = rank()
+
+    ranked_order = rank(parsed_emails)
+    emails_by_number = {email['email_id']: email for email in parsed_emails}
     html = ""
-    for i in order:
-        for email in emails:
-            if email['number'] == i:
-                html += f"<h2>Email {i}</h2><p>{email['summary']}</p>"
+    for num in ranked_order:
+        email = emails_by_number.get(num)
+        html += f"<h2>Reply Code: {email['reply_code']}</h2>"
+        html += f"<h2>Email {num}</h2>"
+        html += f"<p>{email['body_summary']}</p><hr>"
+
     return html
+        
+        
+
 
 
 

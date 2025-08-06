@@ -64,14 +64,15 @@ def summarize_email(plain_body):
                 "role": "system",
                 "content": """You are an assistant that processes email content.
                     Given an email, return a short summary and determine if a response is needed.
-                    Only include it near the body summary
+                    Only include it near the body summary. 
 
                     Reply Code Legend:
-                    - 0 = No reply needed
-                    - 1 = Reply is needed
-                    - 2 = Urgent reply required
+                    - 0 = No reply needed. Sender isn't asking questions or looking for information
+                    - 1 = Reply is needed. Sender asked question or needs information.
+                    - 2 = Urgent reply required. Sender asked question or needs information. Asked for urgent response.
 
-                    Separate the reply code and body summary by a period and space.
+                    Completely ensure the reply code and body summary by a period and space.
+                    Example: 0. summary....
                     """
             },  
             {
@@ -84,3 +85,81 @@ def summarize_email(plain_body):
     )
     return completion.choices[0].message.content.strip()
     
+
+
+def checkreply(summary, subject, sender, reply_code):
+    if reply_code == 0:
+        return "No reply needed"
+
+    elif "No summary available" in summary:
+        return "No reply needed" 
+    
+    else:
+        #Step 1: find out what is needed from the user
+        response_query = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": f"You are a helpful assistant preparing to write a reply to the following email."
+            },
+            {
+
+                "role": "user",
+                "content": f"""
+
+                Context:
+                - Sender: {sender}
+                - Subject: {subject}
+                - Summary: {summary}
+
+                You are helping the user craft a reply to this email.
+                Ask the user what personal details or information they need to provide to complete the reply 
+                (for example, how they feel, which company they want to work for, etc.).
+                The question should be direct, relevant, and assume the user is the one replying to the sender above.
+
+                Return only the question.
+                """
+            }
+            ],
+            temperature=0.3,
+            max_tokens=256
+        )
+        question = response_query.choices[0].message.content.strip()
+
+        #Step 2: prompt back to the user and get a response
+        print("\n📬 This email needs a reply.")
+        print("🤖 The AI needs more information first:")
+        print(f"👉 {question}\n")
+        user_input = input("Your answer: ")
+        print(user_input)
+
+        #Step 3: return a final reply message from all the information
+        
+        reply_prompt = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": f"""
+                You are a helpful assistant writing an email reply in a tone that matches the sent email.
+                
+                Email Summary:
+                Sender: {sender}
+                Subject: {subject}
+                Summary: {summary}
+
+                The user has provided this additional information:
+                "{user_input}"
+
+                You are writing in behalf of the user, who is responding to the email itself.
+                The sender of the email is who this email is being written for. Use the given information
+                in order to answer the email as if it you were the person themself writing a full reply.
+                """
+            }
+            ],
+            temperature=0.3,
+            max_tokens=256
+        )
+        
+        return reply_prompt.choices[0].message.content.strip() 

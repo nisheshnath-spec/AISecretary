@@ -91,6 +91,7 @@ def profile():
         html += f"<h2>Reply Code: {email['reply_code']}</h2>"
         html += f"<h2>Email {num}</h2>"
         html += f"<p>{email['body_summary']}</p><hr>"
+        html += f"<p>{email['reply']}</p>"
 
     return html
         

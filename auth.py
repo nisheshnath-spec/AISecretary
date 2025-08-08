@@ -1,7 +1,7 @@
 #auth.py
 import os
 import flask
-from flask import redirect, session, url_for, request
+from flask import redirect, session, url_for, request, render_template_string
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
@@ -10,7 +10,7 @@ import os
 import json
 import base64
 from parsing import parse_emails
-from summarizer import rank
+from summarizer import rank, compose_reply, reply_info_question
 
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
@@ -92,6 +92,9 @@ def profile():
         html += f"<h2>Email {num}</h2>"
         html += f"<p>{email['body_summary']}</p><hr>"
         html += f"<p>{email['reply']}</p>"
+        if email['reply_code'] > 0:
+            html += f'<div><a href="/reply/{email["email_id"]}">Draft a reply</a></div>'
+            html += "<hr>"
 
     return html
         
@@ -121,3 +124,42 @@ def profile():
     # decoded_bytes = base64.urlsafe_b64decode(body_data + '==')
     # decoded_text = decoded_bytes.decode('utf-8')
     # return f"<h2>Subject:</h2><p>{subject}</p><h2>Body:</h2><pre>{decoded_text}</pre>"
+
+
+def reply_email(email_id):
+    if 'credentials' not in session:
+        return redirect(url_for('login'))
+    
+    creds = Credentials.from_authorized_user_info(json.loads(session['credentials']), SCOPES)
+    emails = parse_emails(creds, max_results = 1)
+    by_id = {e['email_id']: e for e in emails}
+    e = by_id.get(email_id)
+    if not e:
+        return "Email not found", 404
+    
+    if e['reply_code'] == 0:
+        return "No reply necessary"
+    
+    if request.method == 'POST':
+        user_info = request.form.get('user_info', '').strip()
+        draft = compose_reply(e['sender'], e['subject'], user_info, e['body_summary'])
+        return render_template_string("""
+            <h2>Draft Reply</h2>
+            <pre>{{ draft }}</pre>
+            <p>(Add a 'Send' button later.)</p>
+            <a href="/profile">Back</a>
+        """, draft=draft)
+    
+    question = reply_info_question(e['sender'], e['subject'], e['body_summary'])
+    return render_template_string("""
+        <h2>Reply to: {{ subj }}</h2>
+        <p><b>From:</b> {{ sender }}</p>
+        <p>{{ summary }}</p>
+        <hr/>
+        <p><b>Question:</b> {{ question }}</p>
+        <form method="post">
+            <textarea name="user_info" rows="6" cols="60" placeholder="Type your answer here..."></textarea><br/>
+            <button type="submit">Generate Draft</button>
+        </form>
+        <a href="/profile">Back</a>
+    """, subj=e['subject'], sender=e['sender'], summary=e['body_summary'], question=question)

@@ -3,9 +3,10 @@ import base64
 from googleapiclient.discovery import build
 import re
 from bs4 import BeautifulSoup
-from summarizer import summarize_email, checkreply
+from summarizer import summarize_email
+from flask import request, render_template_string
 
-def parse_emails(creds, timeframe = '1d', max_results = 2):
+def parse_emails(creds, timeframe = '1d', max_results = 1):
     """Fetches and parses emails within a given timeframe. It will return a list of emails
     with keys, subcet, sender, date, and body."""
     service = build('gmail', 'v1', credentials=creds)
@@ -49,7 +50,6 @@ def parse_emails(creds, timeframe = '1d', max_results = 2):
                     body_summary = summarize_email(body_plain)
                     reply_code = int(body_summary[0:1])
                     body_summary = body_summary[2:]
-                    reply = checkreply(body_summary, subject, sender, reply_code)
                     break
         # Fallback for body if not found in parts
         elif 'body' in payload and 'data' in payload['body']:
@@ -60,11 +60,13 @@ def parse_emails(creds, timeframe = '1d', max_results = 2):
             body_summary = summarize_email(body_plain)
             reply_code = int(body_summary[0:1])
             body_summary = body_summary[2:]
-            reply = checkreply(body_summary, subject, sender, reply_code)
+            #reply = checkreply(body_summary, subject, sender, reply_code)
 
         
         email_list.append({
             'email_id': email_id,
+            'message_id': msg['id'],
+            'thread_id': msg.get('threadId'),
             'subject': subject,
             'sender': sender,
             'date': date,

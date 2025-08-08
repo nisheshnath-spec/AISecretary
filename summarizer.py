@@ -15,6 +15,7 @@ if TOGETHER_API_KEY is None:
 client = Together(api_key=TOGETHER_API_KEY)
 
 # Model to use (you can swap this out if you like)
+#MODEL = "openai/gpt-oss-120b"
 MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
 
 #rank the summaries based upon importance
@@ -87,79 +88,104 @@ def summarize_email(plain_body):
     
 
 
-def checkreply(summary, subject, sender, reply_code):
-    if reply_code == 0:
-        return "No reply needed"
+# def checkreply(summary, subject, sender, reply_code):
+#     if reply_code == 0:
+#         return "No reply needed"
 
-    elif "No summary available" in summary:
-        return "No reply needed" 
+#     elif "No summary available" in summary:
+#         return "No reply needed" 
     
-    else:
-        #Step 1: find out what is needed from the user
-        response_query = client.chat.completions.create(
-        model=MODEL,
-        messages=[
-            {
-                "role": "system",
-                "content": f"You are a helpful assistant preparing to write a reply to the following email."
-            },
-            {
+#     else:
+#         #Step 1: find out what is needed from the user
+#         response_query = client.chat.completions.create(
+#         model=MODEL,
+#         messages=[
+#             {
+#                 "role": "system",
+#                 "content": f"You are a helpful assistant preparing to write a reply to the following email."
+#             },
+#             {
 
-                "role": "user",
-                "content": f"""
+#                 "role": "user",
+#                 "content": f"""
 
-                Context:
-                - Sender: {sender}
-                - Subject: {subject}
-                - Summary: {summary}
+#                 Context:
+#                 - Sender: {sender}
+#                 - Subject: {subject}
+#                 - Summary: {summary}
 
-                You are helping the user craft a reply to this email.
-                Ask the user what personal details or information they need to provide to complete the reply 
-                (for example, how they feel, which company they want to work for, etc.).
-                The question should be direct, relevant, and assume the user is the one replying to the sender above.
+#                 You are helping the user craft a reply to this email.
+#                 Ask the user what personal details or information they need to provide to complete the reply 
+#                 (for example, how they feel, which company they want to work for, etc.).
+#                 The question should be direct, relevant, and assume the user is the one replying to the sender above.
 
-                Return only the question.
-                """
-            }
-            ],
-            temperature=0.3,
-            max_tokens=256
-        )
-        question = response_query.choices[0].message.content.strip()
+#                 Return only the question.
+#                 """
+#             }
+#             ],
+#             temperature=0.3,
+#             max_tokens=256
+#         )
+#         question = response_query.choices[0].message.content.strip()
 
-        #Step 2: prompt back to the user and get a response
-        print("\n📬 This email needs a reply.")
-        print("🤖 The AI needs more information first:")
-        print(f"👉 {question}\n")
-        user_input = input("Your answer: ")
-        print(user_input)
+#         #Step 2: prompt back to the user and get a response
+#         print("\n📬 This email needs a reply.")
+#         print("🤖 The AI needs more information first:")
+#         print(f"👉 {question}\n")
+#         user_input = input("Your answer: ")
+#         print(user_input)
 
-        #Step 3: return a final reply message from all the information
+#         #Step 3: return a final reply message from all the information
         
-        reply_prompt = client.chat.completions.create(
-        model=MODEL,
-        messages=[
-            {
-                "role": "system",
-                "content": f"""
-                You are a helpful assistant writing an email reply in a tone that matches the sent email.
+#         reply_prompt = client.chat.completions.create(
+#         model=MODEL,
+#         messages=[
+#             {
+#                 "role": "system",
+#                 "content": f"""
+#                 You are a helpful assistant writing an email reply in a tone that matches the sent email.
                 
-                Email Summary:
-                Sender: {sender}
-                Subject: {subject}
-                Summary: {summary}
+#                 Email Summary:
+#                 Sender: {sender}
+#                 Subject: {subject}
+#                 Summary: {summary}
 
-                The user has provided this additional information:
-                "{user_input}"
+#                 The user has provided this additional information:
+#                 "{user_input}"
 
-                You are writing in behalf of the user, who is responding to the email itself.
-                The sender of the email is who this email is being written for. Use the given information
-                in order to answer the email as if it you were the person themself writing a full reply.
-                """
-            }
-            ],
-            temperature=0.3,
-            max_tokens=256
-        )
+#                 You are writing in behalf of the user, who is responding to the email itself.
+#                 The sender of the email is who this email is being written for. Use the given information
+#                 in order to answer the email as if it you were the person themself writing a full reply.
+#                 """
+#             }
+#             ],
+#             temperature=0.3,
+#             max_tokens=256
+#         )
         
-        return reply_prompt.choices[0].message.content.strip() 
+#         return reply_prompt.choices[0].message.content.strip() 
+
+def reply_info_question(sender, subject, summary, model = MODEL):
+    completion = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": "You help users craft replies by first asking ONE key clarifying question."},
+            {"role": "user", "content": f"Sender: {sender}\nSubject: {subject}\nSummary: {summary}\nReturn only ONE question the user must answer before replying."}
+        ],
+        temperature=0.3,
+        max_tokens=128
+    )
+    return completion.choices[0].message.content.strip()
+
+def compose_reply(subject, sender, summary, user_input, model = MODEL):
+    completion = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": "Write a concise, professional reply in the user's voice."},
+            {"role": "user", "content": f"Sender: {sender}\nSubject: {subject}\nSummary: {summary}\nExtra info from user: {user_input}\nWrite the full email body only."}
+        ],
+        temperature=0.3,
+        max_tokens=256
+    )
+    return completion.choices[0].message.content.strip()
+

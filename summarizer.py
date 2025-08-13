@@ -15,8 +15,8 @@ if TOGETHER_API_KEY is None:
 client = Together(api_key=TOGETHER_API_KEY)
 
 # Model to use (you can swap this out if you like)
-#MODEL = "openai/gpt-oss-120b"
-MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
+MODEL = "openai/gpt-oss-20b"
+#MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
 
 #rank the summaries based upon importance
 def rank(email_list):

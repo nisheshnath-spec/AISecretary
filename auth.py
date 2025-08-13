@@ -11,21 +11,44 @@ import json
 import base64
 from parsing import parse_emails
 from summarizer import rank, compose_reply, reply_info_question
+import email.utils
+from email.message import EmailMessage
+from googleapiclient.errors import HttpError
 
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
 
 load_dotenv()
 
 # Load from environment
 CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/gmail.send",
+]
 REDIRECT_URI = 'http://127.0.0.1:5000/oauth2callback'
 
 # In-memory token store (for dev only)
 TOKEN_FILE = 'token.json'
 
 def login():
+    # Check if we already have credentials in session
+    creds_json = session.get('credentials')
+    if creds_json:
+        try:
+            creds = Credentials.from_authorized_user_info(json.loads(creds_json), SCOPES)
+            # If any required scopes are missing, clear session to force re-consent
+            if not set(SCOPES).issubset(set(creds.scopes or [])):
+                print("⚠️ Scope mismatch — forcing re-consent.")
+                session.clear()
+        except Exception as e:
+            # If creds are corrupt or expired, clear them
+            print(f"⚠️ Invalid credentials found: {e}")
+            session.clear()
+
+    # Always create a fresh Flow if no valid creds
     flow = Flow.from_client_config(
         {
             "web": {
@@ -39,8 +62,13 @@ def login():
         redirect_uri=REDIRECT_URI
     )
 
-    auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline', include_granted_scopes='true')
+    auth_url, _ = flow.authorization_url(
+        prompt='consent',
+        access_type='offline',
+        include_granted_scopes='true'
+    )
     return redirect(auth_url)
+
 
 def oauth2callback():
     flow = Flow.from_client_config(
@@ -91,7 +119,7 @@ def profile():
         html += f"<h2>Reply Code: {email['reply_code']}</h2>"
         html += f"<h2>Email {num}</h2>"
         html += f"<p>{email['body_summary']}</p><hr>"
-        html += f"<p>{email['reply']}</p>"
+        #html += f"<p>{email['reply']}</p>"
         if email['reply_code'] > 0:
             html += f'<div><a href="/reply/{email["email_id"]}">Draft a reply</a></div>'
             html += "<hr>"
@@ -131,6 +159,7 @@ def reply_email(email_id):
         return redirect(url_for('login'))
     
     creds = Credentials.from_authorized_user_info(json.loads(session['credentials']), SCOPES)
+    service = build('gmail', 'v1', credentials=creds)
     emails = parse_emails(creds, max_results = 1)
     by_id = {e['email_id']: e for e in emails}
     e = by_id.get(email_id)
@@ -140,16 +169,64 @@ def reply_email(email_id):
     if e['reply_code'] == 0:
         return "No reply necessary"
     
-    if request.method == 'POST':
+    # Which button did the user press?
+    action = request.form.get('action', '').lower()
+
+    if request.method == 'POST' and action == 'generate':
         user_info = request.form.get('user_info', '').strip()
-        draft = compose_reply(e['sender'], e['subject'], user_info, e['body_summary'])
+        # Correct arg order: (subject, sender, summary, user_input)
+        draft = compose_reply(e['subject'], e['sender'], e['body_summary'], user_info)
         return render_template_string("""
-            <h2>Draft Reply</h2>
-            <pre>{{ draft }}</pre>
-            <p>(Add a 'Send' button later.)</p>
+            <h2>Reply to: {{ subj }}</h2>
+            <p><b>From:</b> {{ sender }}</p>
+            <p>{{ summary }}</p>
+            <hr/>
+            <form method="post">
+                <p><b>Edit your email before sending:</b></p>
+                <textarea name="final_body" rows="12" cols="80">{{ draft }}</textarea><br/><br/>
+                <input type="hidden" name="action" value="send" />
+                <button type="submit">Send</button>
+            </form>
+            <br/>
             <a href="/profile">Back</a>
-        """, draft=draft)
+        """, subj=e['subject'], sender=e['sender'], summary=e['body_summary'], draft=draft)
     
+    if request.method == 'POST' and action == 'send':
+        final_body = request.form.get('final_body', '').strip()
+        if not final_body:
+            return render_template_string("""
+                <p>No content to send.</p>
+                <a href="/profile">Back</a>
+            """)
+        try:
+            # e['sender'] typically contains "Name <email@domain>". Extract just the email.
+            import re
+            m = re.search(r'<([^>]+)>', e['sender'])
+            to_addr = m.group(1) if m else e['sender']
+
+            resp = send_gmail_reply(
+                service=service,
+                to_addr=to_addr,
+                subject=e['subject'],
+                body_text=final_body,
+                thread_id=e.get('thread_id')
+            )
+            return render_template_string("""
+                <h2>✅ Sent!</h2>
+                <p>Your reply has been sent.</p>
+                <p><small>Message ID: {{ mid }}</small></p>
+                <a href="/profile">Back</a>
+            """, mid=resp.get('id', 'unknown'))
+        except HttpError as err:
+            # Common case: missing gmail.send scope -> 403
+            return render_template_string("""
+                <h2>❌ Could not send</h2>
+                <pre>{{ error }}</pre>
+                <p>If this says you're missing the gmail.send scope, please log out and log back in so we can request it.</p>
+                <a href="/profile">Back</a>
+            """, error=str(err))
+
+    # Default GET: ask your info question, then generate
     question = reply_info_question(e['sender'], e['subject'], e['body_summary'])
     return render_template_string("""
         <h2>Reply to: {{ subj }}</h2>
@@ -158,8 +235,24 @@ def reply_email(email_id):
         <hr/>
         <p><b>Question:</b> {{ question }}</p>
         <form method="post">
-            <textarea name="user_info" rows="6" cols="60" placeholder="Type your answer here..."></textarea><br/>
+            <textarea name="user_info" rows="6" cols="60" placeholder="Type your answer here..."></textarea><br/><br/>
+            <input type="hidden" name="action" value="generate" />
             <button type="submit">Generate Draft</button>
         </form>
         <a href="/profile">Back</a>
     """, subj=e['subject'], sender=e['sender'], summary=e['body_summary'], question=question)
+
+def send_gmail_reply(service, to_addr, subject, body_text, thread_id = None):
+    final_subject = subject if subject.lower().startswith("re:") else f"Re: {subject}"
+    msg = EmailMessage()
+    msg['To'] = to_addr
+    msg['Subject'] = final_subject
+    msg.set_content(body_text)
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode('utf-8')
+    body = {"raw": raw}
+    if thread_id:
+        body['thread_id'] = thread_id
+        
+    return service.users().messages().send(userId='me', body=body).execute()
+
+

@@ -12,7 +12,8 @@ def parse_emails(creds, timeframe = '1d', max_results = 1):
     service = build('gmail', 'v1', credentials=creds)
     
     #Use gmail search query for time frame
-    query = f'newer_than:{timeframe} category:primary'
+    #query = f'newer_than:{timeframe} category:primary'
+    query = "sai.babuyuvi@gmail.com"
     results = service.users().messages().list(userId = 'me', q = query, maxResults = max_results).execute()
     
     messages = results.get('messages', [])

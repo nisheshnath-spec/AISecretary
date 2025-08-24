@@ -15,7 +15,7 @@ if TOGETHER_API_KEY is None:
 client = Together(api_key=TOGETHER_API_KEY)
 
 # Model to use (you can swap this out if you like)
-MODEL = "openai/gpt-oss-20b"
+MODEL = "openai/gpt-oss-120b"
 #MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
 
 #rank the summaries based upon importance
@@ -173,7 +173,6 @@ def reply_info_question(sender, subject, summary, model = MODEL):
             {"role": "user", "content": f"Sender: {sender}\nSubject: {subject}\nSummary: {summary}\nReturn only ONE question the user must answer before replying."}
         ],
         temperature=0.3,
-        max_tokens=128
     )
     return completion.choices[0].message.content.strip()
 
@@ -185,7 +184,6 @@ def compose_reply(subject, sender, summary, user_input, model = MODEL):
             {"role": "user", "content": f"Sender: {sender}\nSubject: {subject}\nSummary: {summary}\nExtra info from user: {user_input}\nWrite the full email body only."}
         ],
         temperature=0.3,
-        max_tokens=256
     )
     return completion.choices[0].message.content.strip()
 

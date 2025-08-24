@@ -34,20 +34,6 @@ REDIRECT_URI = 'http://127.0.0.1:5000/oauth2callback'
 TOKEN_FILE = 'token.json'
 
 def login():
-    # Check if we already have credentials in session
-    creds_json = session.get('credentials')
-    if creds_json:
-        try:
-            creds = Credentials.from_authorized_user_info(json.loads(creds_json), SCOPES)
-            # If any required scopes are missing, clear session to force re-consent
-            if not set(SCOPES).issubset(set(creds.scopes or [])):
-                print("⚠️ Scope mismatch — forcing re-consent.")
-                session.clear()
-        except Exception as e:
-            # If creds are corrupt or expired, clear them
-            print(f"⚠️ Invalid credentials found: {e}")
-            session.clear()
-
     # Always create a fresh Flow if no valid creds
     flow = Flow.from_client_config(
         {
@@ -160,7 +146,7 @@ def reply_email(email_id):
     
     creds = Credentials.from_authorized_user_info(json.loads(session['credentials']), SCOPES)
     service = build('gmail', 'v1', credentials=creds)
-    emails = parse_emails(creds, max_results = 1)
+    emails = parse_emails(creds, max_results = 3)
     by_id = {e['email_id']: e for e in emails}
     e = by_id.get(email_id)
     if not e:
@@ -233,7 +219,7 @@ def reply_email(email_id):
         <p><b>From:</b> {{ sender }}</p>
         <p>{{ summary }}</p>
         <hr/>
-        <p><b>Question:</b> {{ question }}</p>
+        <p><b>Answer this question and any more pertinent information: :</b> {{ question }}</p>
         <form method="post">
             <textarea name="user_info" rows="6" cols="60" placeholder="Type your answer here..."></textarea><br/><br/>
             <input type="hidden" name="action" value="generate" />
@@ -250,8 +236,8 @@ def send_gmail_reply(service, to_addr, subject, body_text, thread_id = None):
     msg.set_content(body_text)
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode('utf-8')
     body = {"raw": raw}
-    if thread_id:
-        body['thread_id'] = thread_id
+    if thread_id :
+        body['threadId'] = thread_id
         
     return service.users().messages().send(userId='me', body=body).execute()
 

@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from summarizer import summarize_email
 from flask import request, render_template_string
 
-def parse_emails(creds, timeframe = '1d', max_results = 1):
+def parse_emails(creds, timeframe = '1d', max_results = 3):
     """Fetches and parses emails within a given timeframe. It will return a list of emails
     with keys, subcet, sender, date, and body."""
     service = build('gmail', 'v1', credentials=creds)
@@ -14,6 +14,7 @@ def parse_emails(creds, timeframe = '1d', max_results = 1):
     #Use gmail search query for time frame
     #query = f'newer_than:{timeframe} category:primary'
     query = "sai.babuyuvi@gmail.com"
+    #query = f'in:inbox -from:me category:primary newer_than:{timeframe}'
     results = service.users().messages().list(userId = 'me', q = query, maxResults = max_results).execute()
     
     messages = results.get('messages', [])
@@ -49,7 +50,7 @@ def parse_emails(creds, timeframe = '1d', max_results = 1):
                     body = decoded
                     body_plain = clean_html(decoded)
                     body_summary = summarize_email(body_plain)
-                    reply_code = int(body_summary[0:1])
+                    reply_code = int(body_summary[0:1]) 
                     body_summary = body_summary[2:]
                     break
         # Fallback for body if not found in parts

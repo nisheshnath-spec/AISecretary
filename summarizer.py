@@ -24,17 +24,17 @@ def rank(email_list):
         return []
     numbered_list = ""
     for summary in email_list:
-        numbered_list += f"{summary['email_id']}. {summary['body_summary']}\n"
+        numbered_list += f"ID: {summary['msg_id']}.\nSummary: {summary['body_summary']}\n"
     completion = client.chat.completions.create(
         model=MODEL,
         messages=[
             {
                 "role": "system",
-                "content": f"You are an assistant secretary that ranks emails in terms of importance. You will receive a list of emails and you must rank them in terms of importance by urgency, upcoming meetings, dates, assignments, and job opportunities, and scholarships."
+                "content": f"You are an assistant secretary that ranks emails in terms of importance. You will receive a list of emails and you must rank them in terms of importance by urgency, upcoming meetings, dates, assignments, and job opportunities, and scholarships, using the message id."
             },
             {
                 "role": "user",
-                "content": "Return only the numbers in ranked order of importance of these emails, comma separated. Example: 2, 1, 3.\n"
+                "content": "Return ONLY the alphanumeric message id in ranked order of importance of these emails, comma separated. Example: abc123, def456, ghi789\n"
                 f"Here are the emails: {numbered_list}"
             }
         ],
@@ -42,18 +42,7 @@ def rank(email_list):
         max_tokens=450
     )
     answer = completion.choices[0].message.content.strip()
-    ranked_order = []
-    num = ""
-    for a in answer:
-        if a.isdigit():
-            num += a
-        elif num:
-            ranked_order.append(int(num))
-            num = ""
-    
-    if num:
-        ranked_order.append(int(num))
-    return ranked_order
+    return [id.strip() for id in answer.split(",") if id.strip()]
 
 
 # Function to summarize email
@@ -186,4 +175,29 @@ def compose_reply(subject, sender, summary, user_input, model = MODEL):
         temperature=0.3,
     )
     return completion.choices[0].message.content.strip()
+
+def todo_list(email_list, model = MODEL):
+    summaries = ""
+    for email in email_list:
+        summaries += email["body_summary"]
+    completion = client.chat.completions.create(
+        model = model,
+        messages = [
+            {
+                "role": "system",
+                "content": "You are an assistant that extracts actionable tasks from email summaries. "
+                "Return a clear, numbered to-do list. If no tasks, return 'No tasks.",
+            },
+            {
+                "role": "user",
+                "content": f"Here are the email summaries: \n {summaries}"
+            }
+        
+        ],
+        temperature = 0.3,
+        max_tokens=400,
+    )
+    answer = completion.choices[0].message.content.strip()
+    return answer
+         
 

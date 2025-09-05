@@ -3,7 +3,7 @@ from flask import Flask, session, redirect, url_for
 from dotenv import load_dotenv
 import os
 from parsing import parse_emails
-from auth import login, oauth2callback, profile, reply_email
+from auth import login, oauth2callback, profile, reply_email, todo
 import json
 
 
@@ -18,7 +18,8 @@ def home():
 app.add_url_rule('/login', 'login', login)
 app.add_url_rule('/oauth2callback', 'oauth2callback', oauth2callback)
 app.add_url_rule('/profile', 'profile', profile)
-app.add_url_rule('/reply/<int:email_id>', 'reply_email', reply_email, methods=['GET', 'POST'])  # Added this line
+app.add_url_rule('/reply/<msg_id>', 'reply_email', reply_email, methods=['GET', 'POST'])  # Added this line
+app.add_url_rule('/todo', 'todo', todo)
 
 
 

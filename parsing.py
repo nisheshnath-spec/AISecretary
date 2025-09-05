@@ -13,13 +13,12 @@ def parse_emails(creds, timeframe = '1d', max_results = 3):
     
     #Use gmail search query for time frame
     #query = f'newer_than:{timeframe} category:primary'
-    query = "sai.babuyuvi@gmail.com"
-    #query = f'in:inbox -from:me category:primary newer_than:{timeframe}'
+    #query = "sai.babuyuvi@gmail.com"
+    query = f'in:inbox -from:me category:primary newer_than:{timeframe}'
     results = service.users().messages().list(userId = 'me', q = query, maxResults = max_results).execute()
     
     messages = results.get('messages', [])
     email_list = []  
-    email_id = 1
     for msg_meta in messages:
         msg_id = msg_meta['id']
         msg = service.users().messages().get(userId='me', id=msg_id).execute()
@@ -66,8 +65,7 @@ def parse_emails(creds, timeframe = '1d', max_results = 3):
 
         
         email_list.append({
-            'email_id': email_id,
-            'message_id': msg['id'],
+            'msg_id': msg['id'],
             'thread_id': msg.get('threadId'),
             'subject': subject,
             'sender': sender,
@@ -78,7 +76,6 @@ def parse_emails(creds, timeframe = '1d', max_results = 3):
             'reply_code': reply_code,
             'reply': reply
         })
-        email_id += 1
     return email_list
 
 def clean_html(html):

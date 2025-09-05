@@ -10,7 +10,7 @@ import os
 import json
 import base64
 from parsing import parse_emails
-from summarizer import rank, compose_reply, reply_info_question
+from summarizer import rank, compose_reply, reply_info_question, todo_list
 import email.utils
 from email.message import EmailMessage
 from googleapiclient.errors import HttpError
@@ -27,6 +27,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/gmail.modify",
     "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/calendar",
 ]
 REDIRECT_URI = 'http://127.0.0.1:5000/oauth2callback'
 
@@ -98,7 +99,7 @@ def profile():
     #     html += f"<h2>Body_summary:</h2><pre>{email['body_summary']}</pre><hr>"
 
     ranked_order = rank(parsed_emails)
-    emails_by_number = {email['email_id']: email for email in parsed_emails}
+    emails_by_number = {email['msg_id']: email for email in parsed_emails}
     html = ""
     for num in ranked_order:
         email = emails_by_number.get(num)
@@ -107,9 +108,9 @@ def profile():
         html += f"<p>{email['body_summary']}</p><hr>"
         #html += f"<p>{email['reply']}</p>"
         if email['reply_code'] > 0:
-            html += f'<div><a href="/reply/{email["email_id"]}">Draft a reply</a></div>'
+            html += f'<div><a href="/reply/{email["msg_id"]}">Draft a reply</a></div>'
             html += "<hr>"
-
+    html += f'<div><a href="/todo">Todo list here</a></div>'
     return html
         
         
@@ -140,15 +141,15 @@ def profile():
     # return f"<h2>Subject:</h2><p>{subject}</p><h2>Body:</h2><pre>{decoded_text}</pre>"
 
 
-def reply_email(email_id):
+def reply_email(msg_id):
     if 'credentials' not in session:
         return redirect(url_for('login'))
     
     creds = Credentials.from_authorized_user_info(json.loads(session['credentials']), SCOPES)
     service = build('gmail', 'v1', credentials=creds)
     emails = parse_emails(creds, max_results = 3)
-    by_id = {e['email_id']: e for e in emails}
-    e = by_id.get(email_id)
+    by_id = {e['msg_id']: e for e in emails}
+    e = by_id.get(msg_id)
     if not e:
         return "Email not found", 404
     
@@ -241,4 +242,12 @@ def send_gmail_reply(service, to_addr, subject, body_text, thread_id = None):
         
     return service.users().messages().send(userId='me', body=body).execute()
 
+def todo():
+    if "credentials" not in session:
+        return redirect(url_for("login"))
+    creds = Credentials.from_authorized_user_info(json.loads(session['credentials']), SCOPES)
+    service = build("calendar", "v3", credentials=creds)  # Calendar API service
+    emails = parse_emails(creds, max_results = 3)
+    tasks_text = todo_list(emails)
+    return render_template_string(tasks_text)
 

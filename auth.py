@@ -89,6 +89,8 @@ def profile():
     service = build('gmail', 'v1', credentials=creds)
     user_info = service.users().getProfile(userId='me').execute()
     parsed_emails = parse_emails(creds)
+    from save_json import save_emails_to_json
+    save_emails_to_json(parsed_emails)
     #print out in html for now
     # html = ""
     # for email in parsed_emails:
@@ -103,7 +105,7 @@ def profile():
     html = ""
     for num in ranked_order:
         email = emails_by_number.get(num)
-        html += f"<h2>Reply Code: {email['reply_code']}</h2>"
+        html += f"<h2>Reply Code: {email['classification']}</h2>"
         html += f"<h2>Email {num}</h2>"
         html += f"<p>{email['body_summary']}</p><hr>"
         #html += f"<p>{email['reply']}</p>"

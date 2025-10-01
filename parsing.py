@@ -5,6 +5,8 @@ import re
 from bs4 import BeautifulSoup
 from summarizer import summarize_email
 from flask import request, render_template_string
+from classify import classify_email  
+
 
 def parse_emails(creds, timeframe = '1d', max_results = 3):
     """Fetches and parses emails within a given timeframe. It will return a list of emails
@@ -63,6 +65,8 @@ def parse_emails(creds, timeframe = '1d', max_results = 3):
             body_summary = body_summary[2:]
             #reply = checkreply(body_summary, subject, sender, reply_code)
 
+        #Classifying the email
+        classification = classify_email(body_plain)
         
         email_list.append({
             'msg_id': msg['id'],
@@ -74,7 +78,8 @@ def parse_emails(creds, timeframe = '1d', max_results = 3):
             'body_plain': body_plain,
             'body_summary': body_summary,
             'reply_code': reply_code,
-            'reply': reply
+            'reply': reply,
+            'classification': classification
         })
     return email_list
 

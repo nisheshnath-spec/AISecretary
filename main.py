@@ -5,6 +5,8 @@ import os
 from parsing import parse_emails
 from auth import login, oauth2callback, profile, reply_email, todo
 import json
+from save_json import save_emails_to_json
+
 
 
 load_dotenv()
@@ -14,6 +16,8 @@ app.secret_key = os.getenv("SECRET_KEY")
 @app.route("/")
 def home():
     return '<a href="/login">Login with Google</a>'
+
+
 
 app.add_url_rule('/login', 'login', login)
 app.add_url_rule('/oauth2callback', 'oauth2callback', oauth2callback)
